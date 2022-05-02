@@ -347,12 +347,12 @@ after4 <- ggplot(data=participants_data, aes(x=haveKids))+
     aes(label=paste0(..count..,", ",
     round(..count../sum(..count..)*100,
       1),"%")),
-    vjust=-0.5,
     color = "grey25",
-    size=3.5)+
+    hjust=0.5,
+    vjust=-0.3)+
   ggtitle(label = "Dsitribution of Participants with and without kids",
           subtitle = "Most family do not have kids in Ohio, even though the majority are married")+
-  scale_y_continuous(breaks=seq(0,800,150))+
+  scale_y_continuous(breaks=seq(0,1200,150))+
   theme(axis.title.y= element_text(angle=0),
         plot.title = element_text(color="black", size=16, face="bold.italic"),
         plot.subtitle = element_text(size=10),
@@ -475,6 +475,19 @@ Improvements are made on a few elements:
 
 + The mean value of joviality is marked on the redesigned plot to indicate the differences of joviality index from each household size.
 
+# 5. Quick Look for Remade Visualization 
+```{r fig.width=18, fig.height=15}
+patchwork <- (after1 + after2)/(after3 + after4)/(after5 + after6)
+patchwork + plot_annotation(
+  title = "Demographics of Engagement, Ohio, USA",
+  subtitle = "The below plots reveal the Demographics of the city",
+  theme = theme(plot.title = element_text(size = 22, face="bold"),
+                plot.background = element_rect(fill = NA,
+                                               colour = 'black',
+                                               size = 1),
+                plot.margin = margin(2,2,1,1,"cm"))
+)
+```
 
 # 5. Learning Points
 The purpose of this take-home exercise is to learn from peers and improve our expression on plots. This drives me to reflect what I have done on take-home exercise 1 after viewing all visualization design from different perspectives of my classmates.
@@ -484,10 +497,6 @@ My key takeaways are:
 + There is not just a fixed way to plot a graph or design the visualization for our story. It is always good if plots can deliver clear message and have aesthetics there.
 
 + It is not limited to just use one graph for the visualization. The design of each type of graph has their own characteristics and specific scenarios to use, but sometimes it is not enough to provide the information on single chart. Adding or combining properly other type of graphs in one data visualization could definitely help readers to get your points in short time.
-
-
-
-
 
 
 
