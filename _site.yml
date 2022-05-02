@@ -1,0 +1,21 @@
+name: "ISSS608"
+title: "Visual Analytics_JOYCE TSENG"
+description: |
+  Visual Analytics_JOYCE TSENG
+output_dir: "_site"
+navbar:
+  right:
+    - text: "Home"
+      href: index.html
+    - text: "About"
+      href: about.html
+  left:
+    - text: "DataViz Makeover"
+      menu:
+      - text: "DataViz Makeover 1"
+        href: "DataViz1"
+      - text: "DataCiz Makeover 2"
+        href: "DataViz2"
+    - text: "Take-home Exercise"
+      href: Take-home-Exercise.html
+output: distill::distill_article

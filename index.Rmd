@@ -1,0 +1,20 @@
+---
+title: "Joyce Tseng's Visual Analytics Journey"
+image: "DSCF407.jpg"
+links:
+  - label: LinkedIn
+    url: "https://www.linkedin.com/in/joyce-tseng-a7115a1aa/"
+  - label: GitHub
+    url: "https://github.com/TCY914/ISSS608"
+  - label: Tableau
+    url: "https://public.tableau.com/app/profile/joyce.tseng7628#!/?newProfile=&activeTab=0"
+  - label: Email
+    url: "cytseng.2021@mitb.smu.edu.sg"    
+output:
+  postcards::jolla
+site: distill::distill_website
+---
+ 
+This is Joyce Tseng's Website for works done in SMU MITB Visual Analytics Course, 2021-2022 Apr Term. The content would keep updated each week. 
+
+Hope you enjoy reading my project and keep following my projects!
