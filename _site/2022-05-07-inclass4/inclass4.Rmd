@@ -1,0 +1,56 @@
+---
+title: "In-class Exercise 4"
+description: |
+  A short description of the post.
+author:
+  - name: Joyce Tseng
+    url: https://www.linkedin.com/in/joyce-tseng-a7115a1aa/
+    affiliation: School of Computing and Information Systems (SMU)
+    affiliation_url: https://scis.smu.edu.sg/master-it-business
+date: 2022-05-07
+preview:
+output:
+  distill::distill_article:
+    self_contained: false
+---
+
+
+# Getting Started
+
+## Setting up R packages
+
+To start with, [ggstatsplot](https://indrajeetpatil.github.io/ggstatsplot/) and tidyverse packages will be launched using library().
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, fig.retina = 3)
+```
+
+```{r}
+packages = c('ggstatsplot', 'tidyverse', 'PMCMRplus', 'rstantools')
+for (p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+}
+```
+
+## Importing Data
+```{r}
+exam <- read_csv("data/Exam_data.csv")
+```
+
+## Working with ggstatsplot
+### ANOVA Test
+```{r fig.width=6, fig.height=8}
+set.seed(1234)
+
+ggbetweenstats(
+  data = exam,
+  x = RACE, 
+  y = ENGLISH,
+  type = "bayes"
+)
+```
+
+
+

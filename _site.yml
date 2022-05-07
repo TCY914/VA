@@ -16,6 +16,10 @@ navbar:
         href: "DataViz1"
       - text: "DataCiz Makeover 2"
         href: "DataViz2"
+    - text: "In-class Exercise"
+      menu:
+      - text: "In-class Exercise 4"
+        href: 2022-05-07-inclass4/inclass4.html
     - text: "Take-home Exercise"
       href: Take-home-Exercise.html
 output: distill::distill_article
