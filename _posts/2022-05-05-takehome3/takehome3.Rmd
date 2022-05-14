@@ -1,7 +1,7 @@
 ---
 title: "Take-home Exercise 3"
 description: |
-  This is my Take-home Exercise on exploring the financial health of Ohio in USA, espically focusing on the prosperity of the businesses there. The data is from VAST Challenge 2022 and the topic is about the first point in challenge 3.
+  This is my Take-home Exercise on exploring the financial health of Ohio in USA, espically focusing on the prosperity of the businesses there. 
 author:
   - name: Joyce Tseng
     url: https://www.linkedin.com/in/joyce-tseng-a7115a1aa/
@@ -11,27 +11,35 @@ date: "`r Sys.Date()`"
 preview:
 output:
   distill::distill_article:
-    code_folding: hide
+    #code_folding: Show code
     self_contained: false
     toc: true
     toc_depth: 3
 ---
 
-
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, fig.retina = 3)
 ```
 
 # 1. Overview
-In this take-home exercise, we will explore and reveal the demographics of Ohio in USA by creating data visualizations with `ggplot2` in R. The data is provided and can be downloaded from [VAST Challenge 2022](https://vast-challenge.github.io/2022/). The data visualizations included in this exercise are:
+
+In this take-home exercise, we reveal Ohio's economy and look more in details on its business prosperity by creating interactive data visualizations with `ggplot2` and its extension packages in R. The data is provided and can be downloaded from [VAST Challenge 2022](https://vast-challenge.github.io/2022/) and the topic is about the first point in challenge 3. 
 
 # 2. Data Preparation
 ### 2.1 Installing Packages
+
+The following packages and libraries are installed for this exercise. Important and relative packages for plotting an interactive graph in R are:
+
++ `tidyverse` designs for data science and is used extensively for data preparation and wrangling.
++ `ggiraph` creates dynamic ggplot graphs with hover and click actions.
++ `DT`  provides an R interface to the JavaScript library [DataTables](https://datatables.net/) that creates interactive table on html page.
++ `patchwork` combines multiple ggplot objects into a single figure.
++ `tooltip` a column of datasets are displayed when the mouse is over responding elements.
+
+
 ```{r}
-packages = c('tidyverse', 'plotly', 'readxl', 'knitr', 'dplyr', 'ggplot2', 
-             'grid', 'ggiraph', 'plotly', 'DT', 'patchwork', 'gganimate', 
-             'tidyverse', 'readxl', 'gifski', 'gapminder', 'treemap', 
-             'treemapify', 'rPackedBar', 'plyr')
+packages = c('tidyverse', 'readxl', 'knitr', 'dplyr', 'ggplot2', 'ggiraph',
+             'plotly', 'DT', 'patchwork','crosstalk', 'ggridges')
 
 for(p in packages){
   if(!require(p, character.only = T)){
@@ -41,19 +49,14 @@ for(p in packages){
 }
 ```
 
-### 2.2 Importing the Dataset
-```{r eval=FALSE}
-Jobs <- read_csv("Datasets/Attributes/Jobs.csv")
-Buildings <- read_csv("Datasets/Attributes/Buildings.csv")
-Employers <- read_csv("Datasets/Attributes/Employers.csv")
+```{r eval=FALSE, include=FALSE}
+# Pre-data exploration
 Schools <- read_csv("Datasets/Attributes/Schools.csv")
 Restaurants <- read_csv("Datasets/Attributes/Restaurants.csv")
 Pubs <- read_csv("Datasets/Attributes/Pubs.csv")
 Apartments <- read_csv("Datasets/Attributes/Apartments.csv")
-```
+Buildings <- read_csv("Datasets/Attributes/Buildings.csv")
 
-### 2.3 Data Wrangling and Exploration
-```{r eval=FALSE}
 # Step1: Create a new column called type to identify their industry 
 # Step2: Select the needed columns
 Schools <- Schools %>%
@@ -82,10 +85,7 @@ Apartments_selected <- Apartments %>%
 
 # Combine each dataframe in one table called Type
 Type <- rbind(Schools_selected, Restaurants_selected, Pubs_selected, Apartments_selected)
-```
 
-
-```{r eval=FALSE}
 # Merge dataframes to get the final data and remove duplicate rows
 Buildings_mutated <- Buildings %>%
   left_join(Type, by = "buildingId") %>%
@@ -103,6 +103,20 @@ final_data <- Jobs %>%
   distinct()
 ```
 
+### 2.2 Importing the Dataset
+
+To reveal Ohio's financial health, we would only focus on their main commercial businesses, but not including catering industry like restaurants and Pubs. Therefore, the only dataset would be used in this exercise is regard to Ohio residents' Job information. There are 6 variables in this dataset, including their working hours, working days, hourly rate and education requirement and so on.
+
+```{r eval=FALSE}
+Jobs <- read_csv("Datasets/Attributes/Jobs.csv")
+```
+
+### 2.3 Data Wrangling and Exploration
+
+***DERIVING A NEW COLUMN***
+
+Here we would like to create a new column to view how many employees are there in each company. By doing so, we use the *mutate()* of `dplyr` to generate the frequency by employer_id.
+
 ```{r eval=FALSE}
 # add frequency column
 final_data <- final_data %>%
@@ -110,51 +124,259 @@ final_data <- final_data %>%
   dplyr::mutate(count=n())
 ```
 
+***RENAMING THE COLUMN***
+
+The default name of using *count* to derive the above new column would call count, which is not intuitive to understand. We would like to change the column name and call it No.Employees.
+
 ```{r eval=FALSE}
+# rename the column
+final_data <- final_data %>%
+  rename(c('No.Employees' = 'count'))
+```
+
+***REMOVING USELESS COLUMNS***
+
+There are some columns that would not be used in our visualization later. To keep the data more clean, we remove some useless columns by *subset*.
+
+```{r eval=FALSE}
+# Remove columns
+final_data <- subset(final_data, select = -c(daysToWork, buildingType, type))
+```
+
+***CONVERTING DATA TYPE***
+
+Since we would use the deriving columns that we created previously as the category to classify the raw data, we need to convert the data type from numeric to categorical.
+
+```{r eval=FALSE}
+# Convert numeric column into categorical
+final_data$No.Employees <- as.factor(final_data$No.Employees)
+```
+
+```{r eval=FALSE, include=FALSE}
+saveRDS(Restaurants, file = "Restaurants.rds")
+saveRDS(Pubs, file = "Pubs.rds")
 saveRDS(final_data, file = "final_data.rds")
 ```
 
-```{r}
+```{r include=FALSE}
+Restaurants <- readRDS(file = "Restaurants.rds")
+Pubs <- readRDS(file = "Pubs.rds")
 final_data <- readRDS(file = "final_data.rds")
 ```
 
 # 3. Data Visualizations and Insights
+### 3.1 Distribution of Numbers of Companies on Numbers of Employees
+
+Generally, numbers of employees can be regarded as a company's productivity. Thus, to identify which business is more popular and appears to be more prosperous in Ohio, we would first take a look at their employees number. Since there are over 500 of businesses in our dataset, we use numbers of employees as our category to be the x-axis and display which enterprises have hired the most and the least workers.
+
+To create an interactive graph, it is not enough to only use `ggplot2` to make it. The bar chart of numbers of companies on numbers of employees is plotted as follows:
+
++ *highlight_key()* is part of `plotly` package, which can help us create an object of class *crosstalk::SharedData* to connect and show corresponding outputs of two graphs or a graph with data table.
++ *highlight()* is also a function of `plotly` package. It can link to multiple plotly graphs and set various options for brushing them.
++ *bscols()* makes us easily to put HTML elements side by side. In this graph, it is used for connecting the datatable with the bar chart.
+
+Through the above function, when selecting each whole bar on the graph, the below table would automatically show more details for the corresponding row data.
 
 ```{r}
-graph1 <- ggplot(final_data, aes(x = count)) +
+dd <- highlight_key(final_data)
+
+graph1 <- ggplot(dd, aes(x = No.Employees)) +
+  geom_bar(fill = '#468499') +
+  theme(axis.title.y= element_text(angle=0), axis.ticks.x= element_blank(),
+        panel.background= element_blank(), axis.line= element_line(color= 'grey')) +
+  ggtitle("The Distribution of Numbers of Companies on Numbers of Employees") +
+  xlab("Numbers of Employees") +
+  ylab("Count")
+
+gg <- highlight(ggplotly(graph1),
+                "plotly_selected")
+
+crosstalk::bscols(gg, 
+                  widths = c(12,12),
+                  DT::datatable(dd,
+                                rownames = FALSE,
+                                colnames = c('Education Requirement' = 'educationRequirement',
+                                             'Employer Id' = 'employerId',
+                                             'Hourly Rate' = 'hourlyRate',
+                                             'Numbers of Employees' = 'No.Employees'), 
+                                filter = 'top',
+                                class = 'display'))
+
+```
+
+From the plot, it can be observed:
+
++ Businesses in Ohio with 8 employees have highest number.
++ Highest number of employees in Ohio's businesses is 9.
++ 2 is the lowest number of employees in Ohio's businesses.
+
+
+### 3.2 Distribution of Hourly Rate in Prosperous Businesses
+
+It is not enough to just look at the numbers of labours in a company to display its prosperity. Here, we would like to see the distribution of hourly rate by numbers of employees and further observe whether larger scale of companies would pay more to their employees. The violin graph is plotted by *ploy_ly()*, which is a function in `plotly` and is more or less same as *ggplotly()* to construct an interacitve graph.
+ 
+```{r}
+graph2 <- plot_ly(final_data, 
+                 x = ~No.Employees, 
+                 y = ~hourlyRate,
+                 split = ~No.Employees,
+                 type = 'violin',
+                 box = list(visible = T),
+                 meanline = list(visible = T)) %>%
+  layout(title = "The Distribution of Hourly Rate in Prosperous Businesses",
+         xaxis = list(title = 'Numbers of Employees'),
+         yaxis = list(title = 'Hourly Rate'))
+
+graph2
+```
+
+The violin plot with boxplot can easily show the distribution of hourly rate in each category and disclose some statistical information from the dataset. The graph indicates:
+
++ The range of hourly rate is high in company with 5 and 8 employees, with maximum hourly rate up to 100 and minimum around 10.
++ The majority of residents in Ohio earn around 10 to 20 dollars every hour.
++ The interquartile range of each category are not obvious, meaning that no matter the scale of businesses the wage of most people do not have much difference.
+
+### 3.3 Distribution of Hourly Rate by Education Requirement
+
+Ridge plot is a good visualization to display the distribution of continuous value based on a categorical variable. 
+The possible factor to affect the hourly rate is education requirement. We would like to see whether higher education level would be granted with more wage.
+
+```{r}
+ggplot(final_data, 
+       aes(x = hourlyRate, y = educationRequirement, fill = factor(stat(quantile)))) + 
+  stat_density_ridges(geom = "density_ridges_gradient",
+                      calc_ecdf = TRUE,
+                      quantiles = c(0.025, 0.975)) +
+  scale_fill_manual(
+    name = "Probability", values = c("#FF0000A0", "#A0A0A0A0", "#0000FFA0"),
+    labels = c("(0, 0.025]", "(0.025, 0.975]", "(0.975, 1]")) +
+  ggtitle("The Distribution of Hourly Rate by Education Requirement") +
+  xlab("Hourly Rate") +
+  theme(axis.title.y = element_blank()) 
+```
+
+It can be observed that people who are graduate surely earn more money than others. The density of hourly rate in graduate distribution is around 20 to 30 dollars; however, others are around or below than 15 dollars. In addition, its range in 95% of probability distribution is much wider than other, meaning that most people in this category have higher wage.
+
+### 3.4 Distribution of Numbers of Employees by Education Requirement
+
+***CREATING STATISTICAL DATATABLE***
+
+After exploring the distribution of hourly rate by different education requirements, we would like to see more statistical data about hourly rate based on education requirement by companies' size. Hence, we clean the needed columns and create a new data table for the following graph.
+
+```{r eval=FALSE}
+# Create statistical data information
+graph1_sum <- final_data %>%
+  group_by(No.Employees, educationRequirement) %>%
+  dplyr::summarise(n=n(), mean=mean(hourlyRate), sd=sd(hourlyRate)) %>%
+  mutate(se=sd/sqrt(n-1))
+
+# Convert int column into category
+graph1_sum$No.Employees <- as.factor(graph1_sum$No.Employees)
+
+# Round off to two decimals
+graph1_sum$mean <- round(graph1_sum$mean, digit = 2) 
+graph1_sum$se <- round(graph1_sum$se, digit = 2) 
+graph1_sum$sd <- round(graph1_sum$sd, digit = 2) 
+```
+
+```{r eval=FALSE, include=FALSE}
+saveRDS(graph1_sum, file = "graph1_sum.rds")
+```
+
+```{r include=FALSE}
+graph1_sum <- readRDS(file = "graph1_sum.rds")
+```
+
+***PLOTTING THE GRAPH***
+
+The bar graph displays the percentage of different education requirement roles by companies' size. Moreover, it is connected to the below data table and can select a bar to see the corresponding data.
+
+```{r}
+d1 <- highlight_key(graph1_sum)
+
+final_data$tooltip <- c(paste0(
+  "No. Employees:", final_data$No.Employees,
+  "Percentage: ", final_data$n,
+  "Eduction: ", final_data$educationRequirement))
+
+graph3 <- ggplot(d1, aes(x = No.Employees, y = n, fill = educationRequirement)) +
+  geom_bar(position="fill", stat="identity") +
+  theme(legend.position="top") +
+  ggtitle("Numbers of Employess by Education Requirement") +
+  xlab("Numbers of Employees") +
+  ylab("Percentage\n(%)")
+
+
+gg3 <- highlight(ggplotly(graph3, tooltip = final_data$tooltip),
+                "plotly_selected")
+
+crosstalk::bscols(gg3, 
+                  widths = c(12,12),
+                  DT::datatable(d1,
+                                rownames = FALSE,
+                                colnames = c('Numbers of Employees' = 'No.Employees',
+                                             'Education Requirement' = 'educationRequirement',
+                                             'N' = 'n',
+                                             'Average Hourly Rate' = 'mean',
+                                             'Hourly Rate Std' = 'sd', 
+                                             'Hourly Rate SE' = 'se'),
+                                class = 'display'))
+
+```
+
+
+There are some intereting findings in this interactive graph:
+
++ The average hourly rate in graduate is higher than other education level roles.
++ The differences of average hourly rate is small between people graduating from high school or college and with low education level.
++ The value of standard deviation in hourly rate for people with higher education level would become greater, implying that the education level is not the only way to decide a person's wage.
+
+
+# 4. Learing Points
+
+This take-home exercise helps us to hone our skills to design a good visualization for other people to use. Furthermore, it also makes me more understand the usage of different packages in R for plotting a graph, especially ggplot2 with `ggirafe` and `ggplotly`. 
+
+My key takeaways are:
+
++ Adding interactivity is like a auxiliary tool for us to tell more stories in a graph; however, it is not always a must. It is possible to be an additional function for people to use or even bother them to read from the visualization. Thus, we need to think about the purpose for our visualization design.
+
++ There are many packages can help us build an interactive plot in R, but some of them cannot use together and even would affect another execution. We should always plan first before starting to write down the code so that we can select the correct package to create what we expect.
+
+
+```{r eval=FALSE, include=FALSE}
+plot_ly(data = Restaurants,
+        x = ~maxOccupancy,
+        y = ~foodCost,
+        text = ~paste("Restaurant Id:", restaurantId)) %>%
+  layout(title = "The Distribution of Restaurants' Occupancy and Food Cost",
+         plot_bgcolor = "#e5ecf6",
+         marker = list(size = 5, color = 'black'),
+         xaxis = list(title = "Maximum Occupancy"),
+         yaxis = list(title = "Food Cost"))
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+Pubs$tooltip <- c(paste0(
+  "Pub Id:", Pubs$pubId,
+  "\n Hourly Cost:", Pubs$hourlyCost,
+  "\n Max Occupancy ", final_data$maxOccupancy))
+p <- ggplot(data=Pubs, 
+       aes(x = hourlyCost)) +
   geom_dotplot_interactive(
-    aes(tooltip = employerId),
+    aes(tooltip = Pubs$tooltip),
     stackgroups = TRUE,
-    binwidth = 0.01,
+    binwidth = 0.25,
     method = "histodot") +
-  scale_y_continuous(NULL, breaks = NULL)
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(title="Nubmers of Pubs by Hourly Cost",x="Hourly Cost") +
+  theme_bw()
 
 girafe(
-  ggobj = graph1,
-  width_svg = 10,
-  height_svg = 12*0.5
-)
-```
-
-```{r}
-graph1_1 <- ggplot(data = final_data, aes(x = count, fill = educationRequirement)) +
-  geom_bar() 
-
-graph1_1
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-
-
+  ggobj = p,
+  width_svg = 6,
+  height_svg = 6*0.618)
 ```
 
 

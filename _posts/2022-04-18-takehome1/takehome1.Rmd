@@ -63,7 +63,7 @@ for(p in packages){
 ### 4.2 Importing the Dataset
 Data import was accomplished using read_csv() of readxl package, which is useful for reading csv files into a tibble.
 
-```{r echo=TRUE, eval=FALSE}
+```{r echo=TRUE}
 participants <- read_csv("Datasets/Attributes/Participants.csv")
 FinancialJournal <- read_csv("Datasets/Journals/FinancialJournal.csv")
 
