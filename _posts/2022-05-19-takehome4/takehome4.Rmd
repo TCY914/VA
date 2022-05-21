@@ -1,0 +1,27 @@
+---
+title: "Take-home Exercise 2"
+description: |
+  This is my Take-home Exercise for critiquing and remaking the data visualization in terms of clarity and aesthetics on graphs.
+author:
+  - name: Joyce Tseng
+    url: https://www.linkedin.com/in/joyce-tseng-a7115a1aa/
+    affiliation: School of Computing and Information Systems (SMU)
+    affiliation_url: https://scis.smu.edu.sg/master-it-business
+date: "`r Sys.Date()`"
+preview:
+output:
+  distill::distill_article:
+    code_folding: hide
+    self_contained: false
+    toc: true
+    toc_depth: 3
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, fig.retina = 3)
+```
+
+```{r}
+dt_final <- readRDS(file = "dt_final.rds")
+```
