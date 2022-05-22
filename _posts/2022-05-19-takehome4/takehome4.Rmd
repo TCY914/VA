@@ -1,7 +1,7 @@
 ---
-title: "Take-home Exercise 2"
+title: "Take-home Exercise 4"
 description: |
-  This is my Take-home Exercise for critiquing and remaking the data visualization in terms of clarity and aesthetics on graphs.
+  This is my Take-home Exercise to reveal the daily routine of two residents in Ohio, USA.
 author:
   - name: Joyce Tseng
     url: https://www.linkedin.com/in/joyce-tseng-a7115a1aa/
@@ -11,17 +11,700 @@ date: "`r Sys.Date()`"
 preview:
 output:
   distill::distill_article:
-    code_folding: hide
+    code_folding: Show code
     self_contained: false
     toc: true
     toc_depth: 3
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, fig.retina = 3)
 ```
 
+# 1. Overview
+
+In this take-home exercise, we reveal the daily routine of the most happiness and the less happiness residents in Ohio to see the differences on their everyday behavior. The data is provided and can be downloaded from [VAST Challenge 2022](https://vast-challenge.github.io/2022/). The package of ***VisiElse*** is the main method to plot the graph.  
+
+# 2. Data Preparation
+### 2.1 Installing Packages
+
 ```{r}
-dt_final <- readRDS(file = "dt_final.rds")
+packages = c('tidyverse', 'plotly', 'dplyr', 'data.table', 'lubridate', 'zoo',
+             'ViSiElse', 'scales', 'viridis', 'ggthemes')
+
+for(p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+  library(p, character.only = T)
+}
 ```
+
+### 2.2 Importing Data
+
+```{r eval=FALSE}
+log1 <- read_csv("ParticipantStatusLogs1.csv")
+log2 <- read_csv("ParticipantStatusLogs2.csv")
+participants <- read_csv("Participants.csv")
+
+# merge two logs together
+df <- rbind(log1, log2)
+```
+
+### 2.3 Data Wrangling
+
+***PICKING TWO RESIDENTS***
+
+Here we would like to pick two residents who have the highest (joviality = 0.999234) and the lowest (joviality = 0.000204) value of joviality in Ohio to observe their daily action.
+
+```{r eval=FALSE, include=FALSE}
+saveRDS(df, file = "df.rds")
+saveRDS(participants, file = "participants.rds")
+```
+
+```{r include=FALSE}
+participants <- readRDS(file = "participants.rds")
+```
+
+```{r}
+# Get max and min joviality of participants_id
+# slice_max and slice_min is function from the tidyverse
+max <- participants %>% 
+  slice_min(joviality)
+min <- participants %>% 
+  slice_max(joviality)
+
+max
+min
+```
+
+***FILTERING PICKED RESIDENTS***
+
+```{r eval=FALSE}
+# filter two participants
+df <- df %>% 
+  filter(participantId == "758" | participantId == "131") 
+```
+
+***DERIVING TIME FIELDS***
+
+To derive time relative data like date, day and hour, we use the functions from `lubridate` and `zoo` to extract them.
+
+```{r eval=FALSE}
+# extract date, weekday, hour, minute from timestamp
+df <- df %>%
+  mutate(date = as.Date(timestamp)) %>%
+  mutate(day = weekdays(date)) %>%
+  mutate(hour = hour(timestamp)) %>%
+  mutate(min = minute(timestamp)) %>%
+  mutate(minutes = hour*60 + min)
+```
+
+***DROPPING UNNEEDED DATA***
+
+The data in activity logs records participants' daily behaviour from 2022-03-01 to 2023-05-31, but we just pick the first week (2022-03-01 to 2022-03-07) of data to plot in our exercise.
+
+```{r eval=FALSE}
+df <- df %>%
+  filter(date < "2022-03-08")
+```
+
+```{r eval=FALSE, include=FALSE}
+saveRDS(df, file = "df.rds")
+```
+
+```{r include=FALSE}
+df <- readRDS(file = "df.rds")
+```
+
+***CREATING WEEKLY DATASETS FOR SLEEP, EATEN AND HUNGER***
+
+```{r}
+# Weekly sleep data
+sleep <- df %>% 
+  select(participantId, date, day, sleepStatus, hour, min, minutes) %>%
+  filter(sleepStatus == "Sleeping")
+
+# Weekly eaten data
+eaten <- df %>% 
+  select(participantId, date, day, hungerStatus, hour, min, minutes) %>%
+  filter(hungerStatus == "JustAte")
+
+# Weekly hunger data
+hunger <- df %>% 
+  select(participantId, date, day, hungerStatus, hour, min, minutes) %>%
+  filter(hungerStatus == "Hungry")
+```
+
+```{r eval=FALSE, include=FALSE}
+# Weekly sleep status
+week_sleep <- df  %>% 
+  select(participantId, date, day, sleepStatus, hour, min, minutes) %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+week_sleep <- pivot_wider(week_sleep, names_from = sleepStatus, values_from = value)
+
+# Weekly hunger status
+week_hunger <- df %>% 
+  select(participantId, date, day, hungerStatus, hour, min, minutes) %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+week_hunger <- pivot_wider(week_hunger, names_from = hungerStatus, values_from = value)
+
+# Weekly mode
+week_mode <- df %>% 
+  select(participantId, date, day, currentMode, hour, min, minutes)%>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+week_mode <- pivot_wider(week_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+week <- merge(x = week_sleep, y = week_hunger, by = "participantId", all = TRUE)
+week <- merge(x = week, y = week_mode, by = "participantId", all = TRUE)
+week
+```
+
+***CREATING DAILY DATASET***
+
+```{r}
+# create only Monday data
+Monday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-07")
+
+# create only Tuesday data
+Tuesday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-01")
+
+# create only Wednesday data
+Wednesday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-02")
+
+# create only Thursday data
+Thursday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-03")
+
+# create only Friday data
+Friday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-04")
+
+# create only Saturday data
+Saturday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-05")
+
+# create only Sunday data
+Sunday <- df %>% 
+  select(participantId, date, day, currentMode, hungerStatus,
+         sleepStatus, hour, min, minutes) %>%
+  filter(date == "2022-03-06")
+```
+
+# 3. Data Visualization
+In our dataset, although the daily behavior includes punctual and long action, we would just focus on the start time of all doings. Thus, all actions are regarded as short action.
+
+### 3.1 Daily Pattern on Monday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Monday sleep status
+Mon_sleep <- Monday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Mon_sleep <- pivot_wider(Mon_sleep, names_from = sleepStatus, values_from = value)
+
+# Monday hunger status
+Mon_hunger <- Monday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Mon_hunger <- pivot_wider(Mon_hunger, names_from = hungerStatus, values_from = value)
+
+# Monday mode
+Mon_mode <- Monday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Mon_mode <- pivot_wider(Mon_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Mon <- merge(x = Mon_sleep, y = Mon_hunger, by = "participantId", all = TRUE)
+Mon <- merge(x = Mon, y = Mon_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Mon_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "JustAte",
+           "Transport", "AtWork", "Hungry", "AtRestaurant", "AtRecreation", 
+           "AtHome")
+Mon <- Mon[,Mon_order] 
+```
+
+```{r include=FALSE}
+visi1 <- visielse(Mon, pixel = 30)
+book <- ConvertFromViSibook(visi1@book)
+```
+
+***VISUALIZATION***
+
+```{r}
+# Monday
+group <- c("Id: 113", "Id: 758")
+visi2 <- visielse(Mon,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi2, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.2 Daily Pattern on Tuesday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Tuesday sleep status
+Tue_sleep <- Tuesday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Tue_sleep <- pivot_wider(Tue_sleep, names_from = sleepStatus, values_from = value)
+
+# Tuesday hunger status
+Tue_hunger <- Tuesday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Tue_hunger <- pivot_wider(Tue_hunger, names_from = hungerStatus, values_from = value)
+
+# Tuesday mode
+Tue_mode <- Tuesday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Tue_mode <- pivot_wider(Tue_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Tue <- merge(x = Tue_sleep, y = Tue_hunger, by = "participantId", all = TRUE)
+Tue <- merge(x = Tue, y = Tue_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Tue_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Hungry", "AtRestaurant", "AtRecreation", 
+           "AtHome", "PrepareToSleep")
+Tue <- Tue[,Tue_order] 
+```
+
+***VISUALIZATION***
+
+```{r}
+# Tuesday
+group <- c("Id: 113", "Id: 758")
+visi3 <- visielse(Tue,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi3, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.3 Daily Pattern on Wednesday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Wednesday sleep status
+Wed_sleep <- Wednesday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Wed_sleep <- pivot_wider(Wed_sleep, names_from = sleepStatus, values_from = value)
+
+# Wednesday hunger status
+Wed_hunger <- Wednesday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Wed_hunger <- pivot_wider(Wed_hunger, names_from = hungerStatus, values_from = value)
+
+# Wednesday mode
+Wed_mode <- Wednesday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Wed_mode <- pivot_wider(Wed_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Wed <- merge(x = Wed_sleep, y = Wed_hunger, by = "participantId", all = TRUE)
+Wed <- merge(x = Wed, y = Wed_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Wed_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "Hungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Hungry", "AtRestaurant", "AtRecreation", 
+           "AtHome", "PrepareToSleep")
+Wed <- Wed[,Wed_order] 
+```
+
+***VISUALIZATION***
+
+```{r}
+# Wednesday
+group <- c("Id: 113", "Id: 758")
+visi4 <- visielse(Wed,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi4, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.4 Daily Pattern on Thursday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Thursday sleep status
+Thu_sleep <- Thursday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Thu_sleep <- pivot_wider(Thu_sleep, names_from = sleepStatus, values_from = value)
+
+# Thursday hunger status
+Thu_hunger <- Thursday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Thu_hunger <- pivot_wider(Thu_hunger, names_from = hungerStatus, values_from = value)
+
+# Thursday mode
+Thu_mode <- Thursday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Thu_mode <- pivot_wider(Thu_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Thu <- merge(x = Thu_sleep, y = Thu_hunger, by = "participantId", all = TRUE)
+Thu <- merge(x = Thu, y = Thu_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Thu_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "Hungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Hungry", "AtRestaurant", "AtRecreation", 
+           "AtHome", "PrepareToSleep")
+Thu <- Thu[,Thu_order] 
+```
+
+***VISUALIZATION***
+
+```{r}
+# Thursday
+group <- c("Id: 113", "Id: 758")
+visi5 <- visielse(Thu,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi5, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.5 Daily Pattern on Friday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Friday sleep status
+Fri_sleep <- Friday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Fri_sleep <- pivot_wider(Fri_sleep, names_from = sleepStatus, values_from = value)
+
+# Friday hunger status
+Fri_hunger <- Friday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Fri_hunger <- pivot_wider(Fri_hunger, names_from = hungerStatus, values_from = value)
+
+# Friday mode
+Fri_mode <- Friday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Fri_mode <- pivot_wider(Fri_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Fri <- merge(x = Fri_sleep, y = Fri_hunger, by = "participantId", all = TRUE)
+Fri <- merge(x = Fri, y = Fri_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Fri_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "Hungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Starving", "AtRestaurant", "AtRecreation", 
+           "AtHome", "PrepareToSleep")
+Fri <- Fri[,Fri_order] 
+```
+
+***VISUALIZATION***
+
+```{r}
+# Friday
+group <- c("Id: 113", "Id: 758")
+visi6 <- visielse(Fri,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi6, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.6 Daily Pattern on Saturday 
+
+***PIVOTTING AND MERGERING THE DATA***
+
+```{r}
+# Saturday sleep status
+Sat_sleep <- Saturday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Sat_sleep <- pivot_wider(Sat_sleep, names_from = sleepStatus, values_from = value)
+
+# Saturday hunger status
+Sat_hunger <- Saturday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Sat_hunger <- pivot_wider(Sat_hunger, names_from = hungerStatus, values_from = value)
+
+# Saturday mode
+Sat_mode <- Saturday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Sat_mode <- pivot_wider(Sat_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Sat <- merge(x = Sat_sleep, y = Sat_hunger, by = "participantId", all = TRUE)
+Sat <- merge(x = Sat, y = Sat_mode, by = "participantId", all = TRUE)
+```
+
+***ARRANGING THE COLUMN ORDER***
+
+```{r}
+# rearrange the columns
+Sat_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "Hungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Starving", "AtRestaurant", "AtRecreation", 
+           "AtHome", "PrepareToSleep")
+Sat <- Sat[,Sat_order] 
+```
+
+***VISUALIZATION***
+
+```{r}
+# Saturday
+group <- c("Id: 113", "Id: 758")
+visi7 <- visielse(Sat,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi7, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+```{r eval=FALSE, include=FALSE}
+# Sunday sleep status
+Sun_sleep <- Sunday %>% 
+  group_by(participantId, sleepStatus) %>%
+  dplyr::summarise(value = min(minutes))
+
+Sun_sleep <- pivot_wider(Sun_sleep, names_from = sleepStatus, values_from = value)
+
+# Sunrday hunger status
+Sun_hunger <- Sunday %>% 
+  group_by(participantId, hungerStatus) %>%
+  dplyr::summarise(value = min(minutes))
+  
+Sun_hunger <- pivot_wider(Sun_hunger, names_from = hungerStatus, values_from = value)
+
+# Saturday mode
+Sun_mode <- Sunday %>% 
+  group_by(participantId, currentMode) %>%
+  dplyr::summarise(value = min(minutes))
+
+Sun_mode <- pivot_wider(Sun_mode, names_from = currentMode, values_from = value)
+
+# Merger three behavior
+Sun <- merge(x = Sun_sleep, y = Sun_hunger, by = "participantId", all = TRUE)
+Sun <- merge(x = Sun, y = Sun_mode, by = "participantId", all = TRUE)
+Sun
+```
+
+```{r eval=FALSE, include=FALSE}
+# rearrange the columns
+Sun_order <- c("participantId", "Sleeping", "Awake", "BecomingHungry", "Hungry", "JustAte",
+           "BecameFull", "Transport", "AtWork", "Starving", "AtRestaurant", 
+           "AtHome", "PrepareToSleep")
+Sun <- Sun[,Sun_order] 
+```
+
+```{r eval=FALSE, include=FALSE}
+# Sunday
+group <- c("Id: 113", "Id: 758")
+visi8 <- visielse(Sun,
+                  book = book,
+                  group = group,
+                  method = "cut",
+                  tests = F,
+                  pixel = 30,
+                  doplot = F)
+plot(visi8, vp0w = 0.7, unit.tps = "min", scal.unit.tps = 30)
+```
+
+### 3.7 Insight on Everday Pattern
+
+The order of daily action has been arranged ascendingly a person's normal one day schedule. We can observe that participant id = 113 and id = 758 would go to sleep before 24:00. The awake time on each day for this two people is quite different and even at midnight. It is because that they may wake up to go to the toilet or feel thirsty to drink water in the middle of night. Therefore, the awake time sometimes is not in the morning.
+
+In addition, it is also can observable that their everyday working time is also fluctuating, meaning that they may arrive and start to work a bit earlier or later. After leaving their workplace, it is more often for participant id = 758 to go to the restaurant to have a dinner and have recreational activities. This may relates to his low joviality, since he probably needs some ways to release his negative emotion or pressure.
+
+### 3.8 Weekly Pattern on Sleeping
+
+```{r}
+grouped <- sleep %>% 
+  count(day, hour) %>% 
+  ungroup() %>%
+  na.omit()
+  
+ggplot(grouped, 
+       aes(hour, 
+           day, 
+           fill = n)) + 
+geom_tile(color = "white", 
+          size = 0.1) + 
+theme_tufte(base_family = "Helvetica") + 
+coord_equal() +
+scale_fill_gradient(name = "Sleeping Time",
+                    low = "sky blue", 
+                    high = "dark blue") +
+labs(x = NULL, 
+     y = NULL, 
+     title = "Weekly Sleeping Time") +
+theme(axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      legend.title = element_text(size = 8),
+      legend.text = element_text(size = 6) )
+```
+
+A regular sleeping time can be seen from the graph. There is no differences wake-up time and sleep time on weekday and weekend. Normally, they would go to sleep at around 11pm to 12pm and wake up at 9am.
+
+### 3.9 Weekly Pattern on Eaten
+
+```{r}
+grouped <- eaten %>% 
+  count(day, hour) %>% 
+  ungroup() %>%
+  na.omit()
+  
+ggplot(grouped, 
+       aes(hour, 
+           day, 
+           fill = n)) + 
+geom_tile(color = "white", 
+          size = 0.1) + 
+theme_tufte(base_family = "Helvetica") + 
+coord_equal() +
+scale_fill_gradient(name = "Eaten Time",
+                    low = "sky blue", 
+                    high = "dark blue") +
+labs(x = NULL, 
+     y = NULL, 
+     title = "Weekly Eaten Time") +
+theme(axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      legend.title = element_text(size = 8),
+      legend.text = element_text(size = 6) )
+```
+
+The eaten time for people each day is quite different, but we can observe that normally they would have 3 meals in one day and prefer having their lunch a bit late. 
+
+### 3.10 Weekly Pattern on Hunger
+
+```{r}
+grouped <- hunger %>% 
+  count(day, hour) %>% 
+  ungroup() %>%
+  na.omit()
+  
+ggplot(grouped, 
+       aes(hour, 
+           day, 
+           fill = n)) + 
+geom_tile(color = "white", 
+          size = 0.1) + 
+theme_tufte(base_family = "Helvetica") + 
+coord_equal() +
+scale_fill_gradient(name = "Hunger Time",
+                    low = "sky blue", 
+                    high = "dark blue") +
+labs(x = NULL, 
+     y = NULL, 
+     title = "Weekly Hunger Time") +
+theme(axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      legend.title = element_text(size = 8),
+      legend.text = element_text(size = 6) )
+```
+
+The graph of pattern on eaten and hunger is more or less complementary. It can be seen that when there is no record on eaten time, then the color would present in huger graph. For example, during midnight and afternoon.
+
+
+
+
+
+
+
