@@ -1,0 +1,576 @@
+---
+title: "Take-home Exercise 5"
+description: |
+  Practical Visual Analytics Use: VAST Challenge 2022, Challenge 2 - Pattern of Life, focusing on map of social areas and locations with traffic bottleneck.
+author:
+  - name: Joyce Tseng
+    url: https://www.linkedin.com/in/joyce-tseng-a7115a1aa/
+    affiliation: School of Computing and Information Systems (SMU)
+    affiliation_url: https://scis.smu.edu.sg/master-it-business
+date: 2022-05-29
+preview:
+output:
+  distill::distill_article:
+    self_contained: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, fig.retina = 3)
+```
+
+# 1. Overview
+
+In this take-home exercise, we reveal the patterns of life in Ohio, USA by creating data visualization with `tmap`.
+
+With reference to point 1 and 2 in Challenge 2 of [VAST Challenge 2022](https://vast-challenge.github.io/2022/), the following questions will be addressed:
+
++ *Assuming the volunteers are representative of the city’s population, characterize the social areas of the city that you identify.*
+
++ *Where are the busiest areas in Engagement? Are there traffic bottlenecks that should be addressed?*
+
+# 2. Data Preparation
+## 2.1 Installing Packages
+
+The following code chunk installs the required R packages and loads them into RStudio environment.
+
+```{r install packages}
+packages = c('sf', 'tmap', 'tidyverse', 'lubridate', 'clock',
+             'sftime', 'rmarkdown', 'dplyr')
+
+for(p in packages){
+  if(!require(p, character.only = T)){
+    install.packages(p)
+  }
+  library(p, character.only = T)
+}
+```
+
+## 2.2 Importing the Dataset
+
+Relevant datasets are imported using `read_sf()` of sf package, which designs to handle, process, visualise and analyse movement or geospatial data.
+
+```{r import data}
+buildings <- read_sf("data/Buildings.csv", 
+                   options = "GEOM_POSSIBLE_NAMES=location")
+
+employers <- read_sf("data/Employers.csv", 
+                   options = "GEOM_POSSIBLE_NAMES=location")
+
+pubs <- read_sf("data/Pubs.csv", 
+                   options = "GEOM_POSSIBLE_NAMES=location")
+
+restaurants <- read_sf("data/Restaurants.csv", 
+                   options = "GEOM_POSSIBLE_NAMES=location")
+
+apartments <- read_sf("data/Apartments.csv", 
+                   options = "GEOM_POSSIBLE_NAMES=location")
+```
+
+## 2.3 Data Wrangling
+
+To observe residents' movement in Ohio everyday, we import an additional data, TravelJournal, for the following visualizations. The visualization of traffic bottleneck would divide into recreation and commute area. Followed by this, we would reveal the movement path of residents with the highest and lowest joviality to see the differences of their daily patterns.
+
+### 2.3.1 Traffic Bottleneck on Recreation Areas
+
+***IMPORT TRAVEL JOURNAL***
+
+```{r import TravelJournal, eval=FALSE}
+travel <- read_csv("data/TravelJournal.csv") %>%
+  mutate(travelEndLocationId = as.character(travelEndLocationId),
+         travelStartLocationId = as.character(travelStartLocationId))
+```
+
+***FILTER RECREATION PURPOSE***
+
+```{r filter recreation, eval=FALSE}
+travel1 <- travel %>%
+  filter(purpose == "Recreation (Social Gathering)")
+
+travel2 <- travel %>%
+  filter(purpose == "Coming Back From Restaurant")
+```
+
+***CREATE LOCATION POINTS DATA***
+
+```{r create location data, eval=FALSE}
+restaurants_location <- restaurants %>%
+  select(restaurantId, location, buildingId) %>%
+  rename("locationId" = "restaurantId")
+
+pubs_location <- pubs %>%
+  select(pubId, location, buildingId) %>%
+  rename("locationId" = "pubId")
+
+apartments_location <- apartments %>%
+  select(apartmentId, location, buildingId) %>%
+  rename("locationId" = "apartmentId")
+
+employers_location <- employers %>%
+  select(employerId, location, buildingId) %>%
+  rename("locationId" = "employerId")
+
+social_area <- rbind(restaurants_location, 
+                     pubs_location, 
+                     apartments_location, 
+                     employers_location)
+```
+
+***JOIN LOCATION COLUMN***
+
+```{r add travel1/2 location column, eval=FALSE}
+travel1 <- social_area %>%
+  inner_join(travel1, by = c("locationId" = "travelEndLocationId")) %>%
+  rename("travelEndLocationId" = "locationId")
+
+travel2 <- social_area %>%
+  inner_join(travel2, by = c("locationId" = "travelStartLocationId")) %>%
+  rename("travelStartLocationId" = "locationId")
+
+travel1 <- travel1[, c(4,5,6,7,1,8,9,10,11,12,2,3)]
+travel2 <- travel2[, c(4,5,1,6,7,8,9,10,11,12,2,3)]
+
+recreation <- rbind(travel1, travel2)
+```
+
+***DROP USELESS COLUMNS***
+
+```{r drop useless columns in recreation, eval=FALSE}
+recreation <- recreation %>%
+  select(-c(checkInTime, checkOutTime, startingBalance, endingBalance, 
+            travelEndTime, buildingId, purpose))
+```
+
+```{r create recreation.rds, echo=FALSE, eval=FALSE}
+write_rds(recreation,
+          "data/rds/recreation.rds")
+```
+
+```{r read recreation.rds, echo=FALSE}
+recreation <- read_rds("data/rds/recreation.rds")
+```
+
+***DERIVE TIME FIELDS***
+
+```{r derive recreation values from timestamp}
+recreation <- recreation %>%
+  mutate(date = as.Date(travelStartTime)) %>%
+  mutate(day = weekdays(date)) %>%
+  mutate(days = get_day(travelStartTime)) 
+```
+
+***FILTER WEEKDAY & WEEKEND***
+
+```{r create recreation weekend/weekday}
+recreation_weekday <- recreation %>%
+  filter(day == "Monday" | day == "Tuesday" | day == "Wednesday" |
+           day == "Thursday" | day == "Friday")
+
+recreation_weekend <- recreation %>%
+  filter(day == "Saturday" | day == "Sunday")
+```
+
+### 2.3.2 Traffic Bottleneck on Commute Areas
+
+***FILTER COMMUTE PURPOSE***
+
+```{r filter commute, eval=FALSE}
+travel3 <- travel %>%
+  filter(purpose == "Work/Home Commute")
+```
+
+***JOIN LOCATION COLUMN***
+
+```{r add travel3 location column, eval=FALSE}
+travel3 <- social_area %>%
+  inner_join(travel3, by = c("locationId" = "travelEndLocationId")) %>%
+  rename("travelEndLocationId" = "locationId")
+
+travel3 <- travel3[, c(4,5,6,7,1,8,9,10,11,12,2,3)]
+```
+
+***DROP USELESS COLUMNS***
+
+```{r drop useless columns in travel3, eval=FALSE}
+travel3 <- travel3 %>%
+  select(-c(checkInTime, checkOutTime, startingBalance, endingBalance, 
+            travelEndTime, buildingId, purpose))
+```
+
+```{r create commute.rds, echo=FALSE, eval=FALSE}
+write_rds(travel3,
+          "data/rds/commute.rds")
+```
+
+```{r read commute.rds, echo=FALSE}
+commute <- read_rds("data/rds/commute.rds")
+```
+
+***DERIVE TIME FIELD***
+
+```{r dervie value from commute timestamp}
+commute <- commute %>%
+  mutate(date = as.Date(travelStartTime)) %>%
+  mutate(day = weekdays(date)) %>%
+  mutate(days = get_day(travelStartTime)) 
+```
+
+***FILTER WEEKDAY & WEEKEND***
+
+```{r create commute weekend/weekday}
+commute_weekday <- commute %>%
+  filter(day == "Monday" | day == "Tuesday" | day == "Wednesday" |
+           day == "Thursday" | day == "Friday")
+
+commute_weekend <- commute %>%
+  filter(day == "Saturday" | day == "Sunday")
+```
+
+## 2.3.3 Movement Path
+
+***JOIN LOCATION COLUMN***
+
+```{r add movement location, eval=FALSE}
+movement <- social_area %>%
+  inner_join(movement, by = c("locationId" = "travelEndLocationId")) %>%
+  rename("travelEndLocationId" = "locationId")
+
+movement <- movement[, c(4,5,6,7,1,8,9,10,11,12,2,3)]
+```
+
+```{r create movement.rds, echo=FALSE, eval=FALSE}
+write_rds(movement,
+          "data/rds/movement.rds")
+```
+
+```{r read movement.rds, echo=FALSE, eval=FALSE}
+movement <- read_rds("data/rds/movement.rds")
+```
+
+***DERIVE TIME FIELD***
+
+```{r derive time value for movement, eval=FALSE}
+move_path <- movement %>%
+  mutate(date = as.Date(travelStartTime)) %>%
+  mutate(day = weekdays(date)) %>%
+  mutate(days = get_day(travelStartTime)) 
+```
+
+***FILTER PARTICIPANTS WITH HIGHEST AND LOWEST JOVIALITY***
+
+```{r filter by jovilaity, eval=FALSE}
+move_path <- move_path %>% 
+  filter(participantId == "758" | participantId == "131") 
+```
+
+```{r create move_path.rds, echo=FALSE, eval=FALSE}
+write_rds(move_path,
+          "data/rds/move_path.rds")
+```
+
+```{r read move_path.rds, echo=FALSE}
+move_path <- read_rds("data/rds/move_path.rds")
+```
+
+# 3. Data Visualizations and Insights
+## 3.1 Social Areas
+### 3.1.1 Social Areas in Residential Districts
+
++ Blue dot: Residential Districts
++ Red dot: Restaurants
++ Yellow dot: Pubs
+
+```{r social area-residential, fig.width= 10, fig.height= 12}
+tmap_mode("plot")
+tm_shape(buildings) +
+tm_polygons(col = "grey60",
+           size = 1,
+           border.col = "black",
+           border.lwd = 1) +
+tm_shape(apartments) +
+  tm_dots(col = "#4682B4", size = 0.3, alpha= 0.8) +
+tm_shape(pubs) +
+  tm_dots(col = "#FFD700", size = 0.5) +
+tm_shape(restaurants) +
+  tm_dots(col = "#DC143C", size = 0.5)
+```
+
+### 3.1.2 Social Areas in Workplaces
+
++ Green dot: Workplaces
++ Red dot: Restaurants
++ Yellow dot: Pubs
+
+```{r social area-workplace, fig.width= 10, fig.height= 12}
+tmap_mode("plot")
+tm_shape(buildings)+
+tm_polygons(col = "grey60",
+           size = 1,
+           border.col = "black",
+           border.lwd = 1) +
+tm_shape(employers) +
+  tm_dots(col = "#2E8B57", size = 0.5) +
+tm_shape(pubs) +
+  tm_dots(col = "#FFD700", size = 0.5) +
+tm_shape(restaurants) +
+  tm_dots(col = "#DC143C", size = 0.5)
+```
+
+***Insights***
+
+Compared to the distance between residential and recreation places, the location of workplaces has more overlapped areas. This is probably for office workers to release their pressure after work without moving a long distance to the recreational merchants.
+
+## 3.2 Traffic Bottleneck on Recreation Areas
+
+***COMPUTE HEXAGONS***
+
+To plot hexagon binning maps, we need to compute and create hexagons first.
+
+```{r compute hexagons}
+hex <- st_make_grid(buildings, 
+                    cellsize=100, 
+                    square=FALSE) %>%
+  st_sf() %>%
+  rowid_to_column('hex_id')
+```
+
+### 3.2.1 Weekday Recreation
+
+***COUNT EVENT POINTS***
+
+```{r hexagons recreation weekday points}
+weekday_points <- st_join(recreation_weekday, 
+                          hex, 
+                          join = st_within) %>%
+  st_set_geometry(NULL) %>%
+  count(name ='pointCount', hex_id)
+
+head(weekday_points)
+```
+
+***PERFORM RELATIONAL JOIN***
+
+```{r recreation weekday join}
+hex_weekday <- hex %>%
+  left_join(weekday_points, 
+            by = 'hex_id') %>%
+  replace(is.na(.), 0)
+```
+
+***VISUALISATION***
+
+```{r recreation weekday hexagon}
+tmap_mode("view")
+tm_shape(hex_weekday %>%
+           filter(pointCount > 0))+
+  tm_fill("pointCount",
+          n = 8,
+          style = "quantile") +
+  tm_borders(alpha = 0.1)
+tmap_mode("plot")
+```
+
+### 3.2.1 Weekend Recreation
+
+***COUNT EVENT POINTS***
+
+```{r hexagon recreation weekend points}
+weekend_points <- st_join(recreation_weekend, 
+                          hex, 
+                          join = st_within) %>%
+  st_set_geometry(NULL) %>%
+  count(name ='pointCount', hex_id)
+
+head(weekend_points)
+```
+
+***PERFORM RELATIONAL JOIN***
+
+```{r recreation weekend join}
+hex_weekend <- hex %>%
+  left_join(weekend_points, 
+            by = 'hex_id') %>%
+  replace(is.na(.), 0)
+```
+
+***VISUALISATION***
+
+```{r recreation weekend hexagon}
+tmap_mode("view")
+tm_shape(hex_weekend %>%
+           filter(pointCount > 0))+
+  tm_fill("pointCount",
+          n = 8,
+          style = "quantile") +
+  tm_borders(alpha = 0.1)
+tmap_mode("plot")
+```
+
+***Insights***
+
+The popular places in recreation areas on weekend and weekday are different. In addition, it is also interesting that the event points on weekday are slightly more than point on weekend, meaning that people are more frequent to entertain in social areas after work.
+
+## 3.2 Traffic Bottleneck on Commute Areas
+### 3.2.1 Weekday Commute
+
+***COUNT EVENT POINTS***
+
+```{r hexagons commute weekday points}
+cweekday_points <- st_join(commute_weekday, 
+                          hex, 
+                          join = st_within) %>%
+  st_set_geometry(NULL) %>%
+  count(name ='pointCount', hex_id)
+
+head(cweekday_points)
+```
+
+***PERFORM RELATIONAL JOIN***
+
+```{r commute weekday join}
+hex_cweekday <- hex %>%
+  left_join(cweekday_points, 
+            by = 'hex_id') %>%
+  replace(is.na(.), 0)
+```
+
+***VISUALISATION***
+
+```{r commute weekday hexagon}
+tmap_mode("view")
+tm_shape(hex_cweekday %>%
+           filter(pointCount > 0))+
+  tm_fill("pointCount",
+          n = 8,
+          style = "quantile") +
+  tm_borders(alpha = 0.1)
+tmap_mode("plot")
+```
+
+
+### 3.2.1 Weekdend Commute
+
+***COUNT EVENT POINTS***
+
+```{r hexagon commute weekend points}
+cweekend_points <- st_join(commute_weekend, 
+                          hex, 
+                          join = st_within) %>%
+  st_set_geometry(NULL) %>%
+  count(name ='pointCount', hex_id)
+
+head(cweekend_points)
+```
+
+***PERFORM RELATIONAL JOIN***
+
+```{r commute weekend join}
+hex_cweekend <- hex %>%
+  left_join(cweekend_points, 
+            by = 'hex_id') %>%
+  replace(is.na(.), 0)
+```
+
+***VISUALISATION***
+
+```{r commute weekend hexagon}
+tmap_mode("view")
+tm_shape(hex_cweekend %>%
+           filter(pointCount > 0))+
+  tm_fill("pointCount",
+          n = 8,
+          style = "quantile") +
+  tm_borders(alpha = 0.1)
+tmap_mode("plot")
+```
+
+***Insights***
+
+From the above two graphs, it can obviously be observed that the issue of traffic congestion is more serious from Monday to Friday. Crowds of people head to those places, which leads to more transportation issues in the city and have to be addressed by the government.
+
+## 3.3 Movement Path
+
+***CREATE MOVEMENT PATH FROM EVENT POINTS***
+
+```{r}
+path <- move_path %>%
+  group_by(participantId, day) %>%
+  summarize(m = mean(travelStartTime), 
+            do_union=FALSE) %>%
+  st_cast("LINESTRING")
+```
+
+### 3.3.1 Movement of Most Happiness Participants
+
++ Blue dot: Residential Districts
++ Green dot: Workplaces
++ Red dot: Restaurants
++ Yellow dot: Pubs
+
+```{r fig.width= 10, fig.height= 12}
+path_758 <- path %>%
+  filter(participantId == 758)
+
+tm_shape(buildings)+
+tm_polygons(col = "grey60",
+           size = 1,
+           border.col = "black",
+           border.lwd = 1) +
+tm_shape(path_758) +
+  tm_lines(col = '#ffa500',
+           scale = 3) +
+tm_shape(apartments) +
+  tm_dots(col = "#4682B4", size = 0.3, alpha= 0.8) +
+tm_shape(employers) +
+  tm_dots(col = "#2E8B57", size = 0.5) +
+tm_shape(pubs) +
+  tm_dots(col = "#FFD700", size = 0.5) +
+tm_shape(restaurants) +
+  tm_dots(col = "#DC143C", size = 0.5)
+```
+
+### 3.3.1 Movement of Least Happiness Participants
+
++ Blue dot: Residential Districts
++ Green dot: Workplaces
++ Red dot: Restaurants
++ Yellow dot: Pubs
+
+```{r fig.width= 10, fig.height= 12}
+path_131 <- path %>%
+  filter(participantId == 131)
+
+tm_shape(buildings)+
+tm_polygons(col = "grey60",
+           size = 1,
+           border.col = "black",
+           border.lwd = 1) +
+tm_shape(path_131) +
+  tm_lines(col = '#ffa500',
+           scale = 3) +
+tm_shape(apartments) +
+  tm_dots(col = "#4682B4", size = 0.3, alpha= 0.8) +
+tm_shape(employers) +
+  tm_dots(col = "#2E8B57", size = 0.5) +
+tm_shape(pubs) +
+  tm_dots(col = "#FFD700", size = 0.5) +
+tm_shape(restaurants) +
+  tm_dots(col = "#DC143C", size = 0.5)
+```
+
+***Insights***
+
+There is no intersection of the most and least happiness participants in Ohio in the social cycle. Participant id = 758 with the highest joviality mainly has activities in the northwest of the city, while participant id = 131 with the lowest joviality activate in the east of south. In addition, participant id = 758 are more common to go to restaurants and pubs.
+
+# 4. Learning Points
+
+This take-home exercise helps us to understand how to plot visualizations for maps and geospatial data. Furthermore, it also makes me learn a new package in R for plotting a graph, `tmap``. 
+
+My key takeaways are:
+
++ The types of spatial objects would influence the design of graphs. Thus, it is necessary for us to print and read the data to check the spatial objects before creating the visualization. In addition, the type of spatial objects can only be converted from bigger objects to smaller objects but cannot convert reversely. For example, it is feasible to convert objects from polygons to lines or points, but it not viable to obtain lines or polygons from points.
+
++ It is always better to use the installed packages to clean data such as `tidyverse` and `dplyr` instead of using built-in function in R, since those functions are not always applicable to all data types in R. To achieve our data preparation process, we need to take more notice on picking the right function in our code. 
+
+
+
+
