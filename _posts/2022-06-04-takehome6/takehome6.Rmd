@@ -113,7 +113,8 @@ graph1 <- graph_from_data_frame(edges_agg1,
   as_tbl_graph()
 graph1
 ```
-## 3.1 Social Relationship Between Participants
+## 3.1 Overall
+### 3.1.1 Social Relationship Between Participants
 
 ```{r fig.width= 10, fig.height= 12}
 set.seed(12345)
@@ -141,8 +142,13 @@ plot(graph1,
      vertex.size = V(graph1)$size)
 ```
 
+The graph is interesting that there are two patterns can be observed on social network in Ohio. 
 
-## 3.2 Social Network on Weekday and Weekend
+It is obvious that there is a center with lots of crowded edge points on the graph. This represents that people there have more interaction with their friends. However, edge points around with the center means that they do have social activities with others, but they may only hang out with their friends two times a month.
+
+## 3.2 Social Network on Participants with Kids and not
+### 3.2.1 Social Visualization on Weekday and Weekend
+
 ```{r fig.width= 12, fig.height= 14}
 set_graph_style() 
 g <- ggraph(graph1, 
@@ -159,7 +165,11 @@ g + facet_edges(~Weekday) +
   theme(legend.position = 'bottom')
 ```
 
-## 3.3 The Distribution of Social Relationship between Participants with Kids or not on Weekday and Weekend
+Here we focus on the social interaction of participants with kids or without kids. We would like to explore whether family with kids would result in more social network, since they may need to bring their child to the  playground or outdoor activities.
+
+The above graphs do not clearly show the differences of social activities between weekday and weekday. The pattern looks similar in each day. Therefore, to observe more clear for the pattern, we would further plot the distribution of social relationship.
+
+### 3.2.2 The Distribution of Social Relationship on Weekday and Weekend
 
 ```{r}
 g <- ggplot(data = fulltable, aes(x = Weekday, fill = haveKids)) +
@@ -170,5 +180,5 @@ g <- ggplot(data = fulltable, aes(x = Weekday, fill = haveKids)) +
 ```
 ![](/Users/joyce/TCY914/VA/_posts/2022-06-04-takehome6/image004.png)
 
-
+It is interesting that there are more social activities on weekday, especially from Monday to Thursday. The highest count is showed on Thursday. In addition, family without kids has less activities. This is might due to the fact that the number of participants with kid in the data is much less than people without kids. It is surprised that there are less social activities on weekend for people with kids. This may infer that parents pay more attention on their work on weekday and prefer to allocate their time with their children but not have activities with other friends.
 

@@ -1501,14 +1501,20 @@ class="uri">https://scis.smu.edu.sg/master-it-business</a>
 </ul></li>
 <li><a href="#data-visualization">3.Data Visualization</a>
 <ul>
-<li><a href="#social-relationship-between-participants">3.1 Social
+<li><a href="#overall">3.1 Overall</a>
+<ul>
+<li><a href="#social-relationship-between-participants">3.1.1 Social
 Relationship Between Participants</a></li>
-<li><a href="#social-network-on-weekday-and-weekend">3.2 Social Network
-on Weekday and Weekend</a></li>
+</ul></li>
+<li><a href="#social-network-on-participants-with-kids-and-not">3.2
+Social Network on Participants with Kids and not</a>
+<ul>
+<li><a href="#social-visualization-on-weekday-and-weekend">3.2.1 Social
+Visualization on Weekday and Weekend</a></li>
 <li><a
-href="#the-distribution-of-social-relationship-between-participants-with-kids-or-not-on-weekday-and-weekend">3.3
-The Distribution of Social Relationship between Participants with Kids
-or not on Weekday and Weekend</a></li>
+href="#the-distribution-of-social-relationship-on-weekday-and-weekend">3.2.2
+The Distribution of Social Relationship on Weekday and Weekend</a></li>
+</ul></li>
 </ul></li>
 </ul>
 </nav>
@@ -1637,8 +1643,9 @@ igraph file into tidygraph data model.</p>
 3     2    60 Monday       4
 # … with 51,647 more rows</code></pre>
 </div>
-<h2 id="social-relationship-between-participants">3.1 Social
-Relationship Between Participants</h2>
+<h2 id="overall">3.1 Overall</h2>
+<h3 id="social-relationship-between-participants">3.1.1 Social
+Relationship Between Participants</h3>
 <div class="layout-chunk" data-layout="l-body">
 <div class="sourceCode">
 <pre class="sourceCode r"><code class="sourceCode r"><span class='fu'><a href='https://rdrr.io/r/base/Random.html'>set.seed</a></span><span class='op'>(</span><span class='fl'>12345</span><span class='op'>)</span>
@@ -1668,8 +1675,17 @@ Relationship Between Participants</h2>
 </div>
 <p><img src="takehome6_files/figure-html5/unnamed-chunk-7-1.png" width="960" /></p>
 </div>
-<h2 id="social-network-on-weekday-and-weekend">3.2 Social Network on
-Weekday and Weekend</h2>
+<p>The graph is interesting that there are two patterns can be observed
+on social network in Ohio.</p>
+<p>It is obvious that there is a center with lots of crowded edge points
+on the graph. This represents that people there have more interaction
+with their friends. However, edge points around with the center means
+that they do have social activities with others, but they may only hang
+out with their friends two times a month.</p>
+<h2 id="social-network-on-participants-with-kids-and-not">3.2 Social
+Network on Participants with Kids and not</h2>
+<h3 id="social-visualization-on-weekday-and-weekend">3.2.1 Social
+Visualization on Weekday and Weekend</h3>
 <div class="layout-chunk" data-layout="l-body">
 <div class="sourceCode">
 <pre class="sourceCode r"><code class="sourceCode r"><span class='fu'>set_graph_style</span><span class='op'>(</span><span class='op'>)</span> 
@@ -1689,10 +1705,17 @@ Weekday and Weekend</h2>
 </div>
 <p><img src="takehome6_files/figure-html5/unnamed-chunk-8-1.png" width="1152" /></p>
 </div>
-<h2
-id="the-distribution-of-social-relationship-between-participants-with-kids-or-not-on-weekday-and-weekend">3.3
-The Distribution of Social Relationship between Participants with Kids
-or not on Weekday and Weekend</h2>
+<p>Here we focus on the social interaction of participants with kids or
+without kids. We would like to explore whether family with kids would
+result in more social network, since they may need to bring their child
+to the playground or outdoor activities.</p>
+<p>The above graphs do not clearly show the differences of social
+activities between weekday and weekday. The pattern looks similar in
+each day. Therefore, to observe more clear for the pattern, we would
+further plot the distribution of social relationship.</p>
+<h3
+id="the-distribution-of-social-relationship-on-weekday-and-weekend">3.2.2
+The Distribution of Social Relationship on Weekday and Weekend</h3>
 <div class="layout-chunk" data-layout="l-body">
 <div class="sourceCode">
 <pre class="sourceCode r"><code class="sourceCode r"><span class='va'>g</span> <span class='op'>&lt;-</span> <span class='fu'>ggplot</span><span class='op'>(</span>data <span class='op'>=</span> <span class='va'>fulltable</span>, <span class='fu'>aes</span><span class='op'>(</span>x <span class='op'>=</span> <span class='va'>Weekday</span>, fill <span class='op'>=</span> <span class='va'>haveKids</span><span class='op'>)</span><span class='op'>)</span> <span class='op'>+</span>
@@ -1705,6 +1728,15 @@ or not on Weekday and Weekend</h2>
 </div>
 <p><img
 src="image004.png" /></p>
+<p>It is interesting that there are more social activities on weekday,
+especially from Monday to Thursday. The highest count is showed on
+Thursday. In addition, family without kids has less activities. This is
+might due to the fact that the number of participants with kid in the
+data is much less than people without kids. It is surprised that there
+are less social activities on weekend for people with kids. This may
+infer that parents pay more attention on their work on weekday and
+prefer to allocate their time with their children but not have
+activities with other friends.</p>
 <div class="sourceCode" id="cb2"><pre
 class="sourceCode r distill-force-highlighting-css"><code class="sourceCode r"></code></pre></div>
 <!--radix_placeholder_article_footer-->
