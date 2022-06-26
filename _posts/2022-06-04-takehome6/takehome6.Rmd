@@ -11,6 +11,7 @@ date: 2022-06-04
 preview:
 output:
   distill::distill_article:
+    code_folding: hide
     self_contained: false
     toc: true
     toc_depth: 3    
@@ -30,11 +31,10 @@ With reference to Challenge 2 of [VAST Challenge 2022](https://vast-challenge.gi
 # 2. Data Preparation
 ## 2.1 Installing Packages
 
-The following code chunk installs the required R packages and loads them into RStudio environment.
+The following code chunk installs the required R packages and loads them into RStudio environment. The loading packages for network visualization are [igraph](https://igraph.org/r/), [tidygraph](https://cran.r-project.org/web/packages/tidygraph/index.html), [ggraph](https://cran.r-project.org/web/packages/ggraph/index.html), [visNetwork](https://datastorm-open.github.io/visNetwork/), while [lubridate](https://lubridate.tidyverse.org/) and [tidyverse](https://www.tidyverse.org/) are packages for data wrangling.
 
 ```{r}
-packages = c('igraph', 'tidygraph', 'ggraph', 'visNetwork', 'lubridate', 
-             'clock','tidyverse')
+packages = c('igraph', 'tidygraph', 'ggraph', 'visNetwork', 'lubridate', 'tidyverse')
 for(p in packages){
   if(!require(p, character.only = T)){
     install.packages(p)
@@ -45,61 +45,124 @@ for(p in packages){
 
 ## 2.2 Importing the Dataset
 
+In social network analysis, there are two main components required to plot a graph.
+
+***Node Data***: represent the source of entity, which refers to vertices in graph theory. In this take-home exercise, the node data contains personal information of participants such as their age, household size, truth of having kids or not, education level and etc.
+
+```{r eval=FALSE}
+Participants <- read_csv("data/Participants.csv")
+```
+
+***Edge Data***: connect the node, which is also called links. In this take-home exercise, the edge data contains information on time and social activities between the participants.
+
 ```{r eval=FALSE}
 SocialNetwork <- read_csv("data/SocialNetwork.csv")
-Participants <- read_csv("data/Participants.csv")
 ```
 
 ## 2.3 Data Wrangling
 
-In social network analysis, there are three main components required to plot a graph.
-
-+ ***Node***: represent the source of entity, which refers to vertices in graph theory.
-+ ***Edge***: connect the node, which is also called links.
-
-In this exercise, we only use one month data from 2022-03-01 to 2022-03-31.
+The following code chunk is to extract the needed data for the visualization. In this exercise, we only use one month data from 2022-03-01 to 2022-03-31. The columns in social network file are renamed for better understanding. The `weekdays()` function is to filter working days and non-working days.
 
 ```{r eval=FALSE}
 nodes <- Participants %>%
   rename("id" = "participantId") %>%
-  select(id, haveKids)
+  select(id, haveKids, joviality)
 
 edges <- SocialNetwork %>%
   filter(timestamp < "2022-04-01") %>%
   select(participantIdFrom, participantIdTo, timestamp) %>%
   rename("source" = "participantIdFrom", "target" = "participantIdTo") %>%
-  mutate(Weekday = weekdays(timestamp))
+  mutate(day = weekdays(timestamp)) %>%
+  mutate(daytype = case_when(day=="Saturday"|day=="Sunday" ~ 'Weekend',
+                             day=="Monday"|day=="Tuesday"|day=="Wednesday"
+                             |day=="Thursday"|day=="Friday" ~ 'Weekday'))
 ```
+
+### 2.3.1 Prepare Overall Data
+
+The following code chuck is to filter and prepare the general data for the later plot.
 
 ```{r eval=FALSE}
 x <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
        "Saturday", "Sunday")
 
-edges_agg1 <- edges %>%
-  group_by(source, target, Weekday) %>%
+total_edges <- edges %>%
+  group_by(source, target, day) %>%
   summarise(Weight = n()) %>%
-  mutate(Weekday =  factor(Weekday, levels = x)) %>%
-  arrange(Weekday) %>%
+  mutate(day =  factor(day, levels = x)) %>%
+  arrange(day) %>%
   filter(source!=target) %>%
-  filter(Weight > 1) %>%
+  filter(Weight > 2) %>%
   ungroup
+
+total_edges <- total_edges %>%
+  left_join(y = nodes, by = c("source" = "id"))
+
+total_nodes <- nodes %>% 
+  filter(id %in% total_edges$source |
+         id %in% total_edges$target)
 ```
 
 ```{r eval=FALSE}
-fulltable <- edges_agg1 %>%
-  left_join(y = nodes, by = c("source" = "id"))
+total <- total_edges %>%
+  left_join(y = total_nodes, by = c("source" = "id"))
+```
+
+### 2.3.2 Prepare Weekday Data
+
+The following code chuck is to filter and prepare the weekday data for the later plot.
+
+```{r eval=FALSE}
+edges_weekday <- edges %>%
+  filter(daytype == 'Weekday') %>%
+  group_by(source, target) %>%
+  summarise(Weight = n()) %>%
+  filter(source!=target) %>%
+  filter(Weight > 4) %>%
+  ungroup()
+
+nodes_weekday <- nodes %>% 
+  filter(id %in% edges_weekday$source |
+         id %in% edges_weekday$target)
+```
+
+
+### 2.3.3 Prepare Weekend Data
+
+The following code chuck is to filter and prepare the weekend data for the later plot.
+
+```{r eval=FALSE}
+edges_weekend <- edges %>%
+  filter(daytype == 'Weekend') %>%
+  group_by(source, target) %>%
+  summarise(Weight = n()) %>%
+  filter(source!=target) %>%
+  filter(Weight > 4) %>%
+  ungroup()
+
+nodes_weekend <- nodes %>% 
+  filter(id %in% edges_weekend$source |
+         id %in% edges_weekend$target)
 ```
 
 ```{r write rds, eval=FALSE, echo=FALSE}
-saveRDS(nodes, file = "nodes.rds")
-saveRDS(edges_agg1, file = "edges_agg1.rds")
-saveRDS(fulltable, file = "fulltable.rds")
+saveRDS(edges, file = "edges.rds")
+saveRDS(total_nodes, file = "total_nodes.rds")
+saveRDS(total_edges, file = "total_edges.rds")
+saveRDS(edges_weekday, file = "edges_weekday.rds")
+saveRDS(nodes_weekday, file = "nodes_weekday.rds")
+saveRDS(edges_weekend, file = "edges_weekend.rds")
+saveRDS(nodes_weekend, file = "nodes_weekend.rds")
 ```
 
 ```{r read rds, echo=FALSE}
-nodes <- readRDS("data/nodes.rds")
-edges_agg1 <- readRDS("data/edges_agg1.rds")
-fulltable <- readRDS("data/fulltable.rds")
+edges <- readRDS("data/edges.rds")
+total_nodes <- readRDS("data/total_nodes.rds")
+total_edges <- readRDS("data/total_edges.rds")
+edges_weekday <- readRDS("data/edges_weekday.rds")
+nodes_weekday<- readRDS("data/nodes_weekday.rds")
+edges_weekend <- readRDS("data/edges_weekend.rds")
+nodes_weekend <- readRDS("data/nodes_weekend.rds")
 ```
 
 # 3.Data Visualization
@@ -107,51 +170,33 @@ fulltable <- readRDS("data/fulltable.rds")
 To create social network graph, `igraph` package is to create the prepared data for the following visualization.
 *graph_from_data_frame()* of igraph is used to covert the nodes and edges data.frame into an igraph file format; while *as_tbl_graph()* of *tidygraph()* is used to convert the igraph file into tidygraph data model.
 
+Before taking a look into the following plots, the following code chunk is to check the proportion of social interaction between weekday and weekend. It is surprising that the percentage of weekday is much higher than weekend, which accounts for 26% of the total. The reason that participants have more social activities on weekday might due to their social interactions in their workplaces.
+
 ```{r}
-graph1 <- graph_from_data_frame(edges_agg1,
-                               vertices = nodes) %>%
-  as_tbl_graph()
-graph1
+overall <- edges %>%
+  group_by(daytype) %>%
+  summarise(percent = n()/nrow(.))
+
+overall
 ```
+
 ## 3.1 Overall
-### 3.1.1 Social Relationship Between Participants
+### 3.1.1 Social Relationship Between Participants with kids and Participants without kids
 
-```{r fig.width= 10, fig.height= 12}
-set.seed(12345)
+In this exercise, we would focus on the social interaction of participants with kids or without kids. We would like to explore whether having a kid would result in more social activities and expand their social network, since they may need to bring their child to the  playground or outdoor activities.
 
-diam <- get_diameter(graph1, directed=T)
+The first plot is to look at the comprehensive social relationship between each participant.
 
-V(graph1)$size <- ifelse (V(graph1)$Weight < 4, 1, 3)
-
-vcol <- rep("gray80", vcount(graph1))
-
-vcol[diam] <- "gold"
-
-ecol <- rep("black", ecount(graph1))
-
-ecol[E(graph1, path=diam)] <- "orange" 
-
-deg <- degree(graph1, mode="all")
-
-# E(net, path=diam) finds edges along a path, here 'diam'
-
-plot(graph1, 
-     vertex.color=vcol, 
-     edge.color=ecol, 
-     edge.arrow.mode=0, 
-     vertex.size = V(graph1)$size)
+```{r}
+gtotal <- graph_from_data_frame(total_edges,
+                               vertices = total_nodes) %>%
+  as_tbl_graph()
+gtotal
 ```
-
-The graph is interesting that there are two patterns can be observed on social network in Ohio. 
-
-It is obvious that there is a center with lots of crowded edge points on the graph. This represents that people there have more interaction with their friends. However, edge points around with the center means that they do have social activities with others, but they may only hang out with their friends two times a month.
-
-## 3.2 Social Network on Participants with Kids and not
-### 3.2.1 Social Visualization on Weekday and Weekend
 
 ```{r fig.width= 12, fig.height= 14}
 set_graph_style() 
-g <- ggraph(graph1, 
+g <- ggraph(gtotal, 
             layout = "nicely") + 
   geom_edge_link(aes(width=Weight), 
                  alpha=0.8) +
@@ -159,19 +204,19 @@ g <- ggraph(graph1,
   geom_node_point(aes(colour = haveKids), 
                   size = 2,
                   alpha=0.6)
-g + facet_edges(~Weekday) +
+g + facet_edges(~day) +
   th_foreground(foreground = "grey80",  
                 border = TRUE) +
   theme(legend.position = 'bottom')
 ```
 
-Here we focus on the social interaction of participants with kids or without kids. We would like to explore whether family with kids would result in more social network, since they may need to bring their child to the  playground or outdoor activities.
+***Insight From the graph***
 
-The above graphs do not clearly show the differences of social activities between weekday and weekday. The pattern looks similar in each day. Therefore, to observe more clear for the pattern, we would further plot the distribution of social relationship.
+The above graphs do not clearly show the differences of social activities between participants with kids and without kids on weekday and weekend. The pattern looks similar in each day. Therefore, to observe the clear pattern, we would further plot the distribution of social relationship.
 
-### 3.2.2 The Distribution of Social Relationship on Weekday and Weekend
+### 3.1.2 The Distribution of Social Relationship on Weekday and Weekend
 
-```{r}
+```{r eval=FALSE}
 g <- ggplot(data = fulltable, aes(x = Weekday, fill = haveKids)) +
   geom_bar(position = "dodge") +  
   labs(x="Weekday", y="Count", fill="Have Kids") +
@@ -179,6 +224,187 @@ g <- ggplot(data = fulltable, aes(x = Weekday, fill = haveKids)) +
         axis.line= element_line(color= 'grey'))
 ```
 ![](/Users/joyce/TCY914/VA/_posts/2022-06-04-takehome6/image004.png)
+***Insight From the graph***
 
-It is interesting that there are more social activities on weekday, especially from Monday to Thursday. The highest count is showed on Thursday. In addition, family without kids has less activities. This is might due to the fact that the number of participants with kid in the data is much less than people without kids. It is surprised that there are less social activities on weekend for people with kids. This may infer that parents pay more attention on their work on weekday and prefer to allocate their time with their children but not have activities with other friends.
+It is interesting that the total of social activities on weekday is higher, especially from Monday to Thursday. The highest count is showed on Thursday. This might because that people would work more hardworking on their jobs to communicate with their colleagues or customers in these four days so as to ensure their tasks can be achieved on Friday and can be relaxed on weekend. Therefore, there are more social interactions. 
 
+In addition, family without kids has less activities. This might be due to the fact that the number of participants with kid in the data is much less than people without kids. It is surprised that there are less social activities on weekend for people with kids. This may infer that parents pay more attention on their work on weekday and prefer to allocate their time with their children but not have activities with other friends.
+
+
+## 3.2 Exploring social Butterflies on Weekdays
+
+```{r}
+#tbl_graph
+gweekday <- graph_from_data_frame(edges_weekday,
+                                  vertices = nodes_weekday) %>%
+  as_tbl_graph()
+gweekday
+```
+
+```{r fig.width= 6, fig.height= 7}
+quantile_gweekday <- quantile(eigen_centrality(gweekday)$vector,
+                           probs = seq(0, 1, 1/10))
+
+V(gweekday)$size = eigen_centrality(gweekday)$vector
+
+gweekday_aggregated <- delete_vertices(gweekday, 
+                                       V(gweekday)[size < quantile_gweekday[10]])
+
+
+set.seed (1234)
+layout1 <- layout_with_fr(gweekday_aggregated)
+
+quantile_gweekday_aggregated <- quantile(V(gweekday_aggregated)$size, 
+                                         #identify top 10% of the new vertices
+                                        probs = seq(0, 1, 1/10))
+
+
+V(gweekday_aggregated)$color <- ifelse (V(gweekday_aggregated)$size > 
+                                          quantile_gweekday_aggregated[10], 
+                                        "gold2", 
+                                        "honeydew3") #color yellow if vertices is top 10%
+E(gweekday_aggregated)$color <- "grey"
+V(gweekday_aggregated)$size <- V(gweekday_aggregated)$size/0.065 
+#Increase the size of nodes based on their centrality score, only those with high score will be visible
+
+V(gweekday_aggregated)$label <- ifelse (V(gweekday_aggregated)$size*0.065 >
+                                          quantile_gweekday_aggregated[10],
+                                        V(gweekday_aggregated)$name,NA)
+#label the vertices if vertices belongs to the top 10%
+
+plot(gweekday_aggregated, edge.arrow.size=0.25,
+     edge.arrow.mode = "-", 
+     vertex.label = V(gweekday_aggregated)$label, 
+     vertex.label.cex = 0.65, 
+     vertex.label.font = 2, 
+     main = "Which Participant has the most influence on weekdays?") 
+```
+
+From the above graph, we can observe that there are 9 participants who are regarded as a influential person based on their EigenVector Score, 686, 359, 460, 390, 255, 342, 478, 274, 398. To explore their social network circle, we would plot the interactive network graph in the exercise later.
+
+## 3.3 Exploring Social Butterflies on Weekends
+
+```{r}
+#tbl_graph
+gweekend <- graph_from_data_frame(edges_weekend,
+                                  vertices = nodes_weekend) %>%
+  as_tbl_graph()
+gweekend
+```
+
+```{r fig.width= 6, fig.height= 7}
+quantile_gweekend <- quantile(eigen_centrality(gweekend)$vector,
+                           probs = seq(0, 1, 1/10))
+
+V(gweekend)$size = eigen_centrality(gweekend)$vector
+
+gweekend_aggregated <- delete_vertices(gweekend, 
+                                       V(gweekend)[size < quantile_gweekend[10]])
+
+
+set.seed (1234)
+layout1 <- layout_with_fr(gweekend_aggregated)
+
+quantile_gweekend_aggregated <- quantile(V(gweekend_aggregated)$size, 
+                                         #identify top 10% of the new vertices
+                                        probs = seq(0, 1, 1/10))
+
+
+V(gweekend_aggregated)$color <- ifelse(V(gweekend_aggregated)$size > 
+                                          quantile_gweekend_aggregated[10], 
+                                        "gold2", 
+                                        "honeydew3") #color yellow if vertices is top 10%
+E(gweekend_aggregated)$color <- "grey"
+V(gweekend_aggregated)$size <- V(gweekend_aggregated)$size/0.065 
+#Increase the size of nodes based on their centrality score, only those with high score will be visible
+
+V(gweekend_aggregated)$label <- ifelse(V(gweekend_aggregated)$size*0.065 >
+                                          quantile_gweekend_aggregated[10],
+                                        V(gweekend_aggregated)$name,NA)
+#label the vertices if vertices belongs to the top 10%
+
+plot(gweekend_aggregated, edge.arrow.size=0.25,
+     edge.arrow.mode = "-", 
+     vertex.label = V(gweekend_aggregated)$label, 
+     vertex.label.cex = 0.65, 
+     vertex.label.font = 2, 
+     main = "Which Participant has the most influence on weekends?") 
+```
+
+From the above graph, it is interesting that 9 influential participants on weekend are different from weekday, which are 693, 417, 613, 435, 258, 357, 447, 323, 450. This is owing to the fact that the purpose and property of social interactions on working days and non-working days is not identical. On weekend, people may socialize more on having entertainment, while on weekday, their social interactions might be more relative to their work. 
+
+## 3.4 Who do the top 10 influencers interact with?
+
+Since the weekday have more social interactions on weekday, here we take a closer look at the top 10 initiators and receivers within the participants.
+
+The following code chunk is to find the top 10 initiator of the weekday social interactions.
+
+```{r}
+initiation <- edges_weekday %>%
+  group_by(source) %>%
+  summarise(Initiation = sum(Weight)) %>%
+  arrange(desc(Initiation)) %>%
+  filter(row_number() <= 10)
+
+top_initiation <- list(initiation$source)
+```
+
+The following code chunk is to find the top 10 receiver of the weekday social interactions.
+
+```{r}
+receiver <- edges_weekday %>%
+  group_by(target) %>%
+  summarise(Receiving = sum(Weight)) %>%
+  arrange(desc(Receiving)) %>%
+  filter(row_number() <= 10)
+
+top_receiver <- list(receiver$target)
+```
+
+The following result show that the top 10 initiator and receiver are same. 
+
+```{r}
+top_initiation
+top_receiver
+```
+
+The following code chunk prepares the data for the visualization and plot the network graph using `vizNetwork()`
+
+```{r}
+edges_weekday_most <- edges_weekday %>%
+  filter(source %in% initiation$source |
+         target %in% initiation$source)
+
+nodes_weekday_most <- nodes_weekday %>%
+  filter(id %in% edges_weekday_most$source |
+         id %in% edges_weekday_most$target)
+```
+
+```{r}
+nodes_weekday_most <- nodes_weekday_most %>%
+  select(-c(joviality))
+
+edges_weekday_most <- edges_weekday_most %>%
+  rename(from = source,
+         to = target)
+```
+
+```{r}
+nodes_weekday_most <- nodes_weekday_most %>%
+  rename(group = haveKids)
+
+visNetwork(nodes_weekday_most,
+           edges_weekday_most, 
+           main = "Are you in the circles of the most socially active people?",
+           submain = 'City of Engagement, Ohio, USA',
+           footer = 'Source: VAST Challenge 2022')%>%
+  visIgraphLayout(layout = 'layout_with_fr') %>%
+  visOptions(highlightNearest = TRUE,
+             nodesIdSelection = TRUE) %>%
+  visLegend() %>%
+  visLayout(randomSeed = 1234)
+```
+
+***Insight From the graph***
+
+The categorical label, True and False, in the plot is to identify participants with kid and without kids. By zooming in the graph and selecting particular participant Id, we are able to look at these 10 people’s social network closely. It is observed that people with kids have more social interactions compared to those without kids.
